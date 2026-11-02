@@ -164,7 +164,9 @@ window.gnAtt = function (st) {
 /* Account (1/11/2026): apps open with the same Google account as this page. "Change account" saves the account to use on this device
    (for people signed in to several Google accounts, e.g. a Gmail plus a work account). */
 function acct() { var u = ''; try { u = localStorage.getItem('gn_user') || ''; } catch (e) {} return u || (attState && attState.email) || ''; }
-function withAcct(h) { var u = acct(); return u && h.indexOf('authuser=') < 0 ? h + (h.indexOf('?') < 0 ? '?' : '&') + 'authuser=' + encodeURIComponent(u) : h; }
+/* No saved account: use the browser's main Google account (authuser=0). Without it script.google.com uses whichever account was last used there (2 Nov 2026). */
+function acctSaved_() { try { return localStorage.getItem('gn_user') || ''; } catch (e) { return ''; } }
+function withAcct(h) { var u = acctSaved_() || '0'; return h.indexOf('authuser=') < 0 ? h + (h.indexOf('?') < 0 ? '?' : '&') + 'authuser=' + encodeURIComponent(u) : h; }
 var AC = { en: { as: 'Signed in as', chg: 'Change account', save: 'Save', ph: 'Your Google email' }, ar: { as: 'الحساب:', chg: 'تغيير الحساب', save: 'حفظ', ph: 'بريدك على جوجل' } };
 function ac(k) { return (AC[lang] && AC[lang][k]) || AC.en[k]; }
 function renderAcct(edit) {
@@ -187,7 +189,7 @@ document.getElementById('lang').addEventListener('click', function () { renderAc
 document.getElementById('lang').addEventListener('click', renderAtt);
 (function () {
   var s = document.createElement('script');
-  s.src = GN_APP + '?api=state&callback=gnAtt' + (acct() ? '&authuser=' + encodeURIComponent(acct()) : '') + '&t=' + Date.now();
+  s.src = GN_APP + '?api=state&callback=gnAtt' + '&authuser=' + encodeURIComponent(acctSaved_() || '0') + '&t=' + Date.now();
   s.async = true; document.body.appendChild(s);
 })();
 </script>
