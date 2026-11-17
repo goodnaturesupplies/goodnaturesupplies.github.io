@@ -57,7 +57,8 @@ a.app:active{transform:scale(.98)}
 .ai .tx{flex:1;min-width:0;overflow-wrap:anywhere}.ai .gt{flex-shrink:0;color:var(--mut)}[dir=rtl] .ai .gt{transform:scaleX(-1)}
 .ai:hover .tx{color:var(--deep);text-decoration:underline}
 .att.ok{border:0;background:#e6f4ea;color:#1e7d45;font-weight:600;font-size:13px;padding:12px 16px}
-@media (max-width:640px){main{padding:18px 14px}.app{flex:1 1 100%;padding:22px 18px}}
+@media (max-width:640px){main{padding:18px 14px;display:flex;flex-direction:column}.app{flex:1 1 100%;padding:22px 18px}#att{order:-1;width:100%;margin:0 0 18px}#att:empty{margin:0}}
+.atth .asof{font-size:11px;color:var(--mut);font-weight:500}
 .acct{text-align:center;font-size:12px;opacity:.8;margin-top:14px;line-height:1.8}.acct button{color:inherit;text-decoration:underline;background:none;border:0;font:inherit;cursor:pointer;padding:0}.acct input{font:inherit;padding:6px 8px;border:1px solid #c9b8a6;border-radius:8px;width:230px;max-width:62vw}.acct form button{text-decoration:none;border:1px solid #8B4F2E;border-radius:8px;padding:6px 12px;margin-inline-start:6px}
 </style>
 </head>
@@ -108,12 +109,14 @@ function render() {
 }
 render();
 document.getElementById('lang').addEventListener('click', function () {
-  lang = lang === 'ar' ? 'en' : 'ar'; try { localStorage.setItem('gn_lang', lang); } catch (e) {} render();
+  lang = lang === 'ar' ? 'en' : 'ar'; try { localStorage.setItem('gn_lang', lang); } catch (e) {} render(); renderAcct(); renderAtt();
 });
 /* Open apps in this same window (a plain link from the Home Screen app would open a separate browser on iPhone), behind the splash. */
 var splash = document.getElementById('splash');
+/* 17/11/2026: never stay stuck behind the splash if an app is slow or fails to open */
+function showSplash() { splash.className = ''; setTimeout(function () { splash.className = 'out'; }, 15000); }
 Array.prototype.forEach.call(document.querySelectorAll('a.app'), function (a) {
-  a.addEventListener('click', function (e) { e.preventDefault(); splash.className = ''; location.href = withAcct(a.href); });
+  a.addEventListener('click', function (e) { e.preventDefault(); showSplash(); location.href = withAcct(a.href); });
 });
 window.addEventListener('pageshow', function (e) { if (e.persisted) splash.className = 'out'; });
 /* Needs attention under the cards (31/10/2026). The page opens straight away; the list is fetched in the background from
@@ -143,28 +146,32 @@ var attState = null, attClosed = false;
 try { attState = JSON.parse(localStorage.getItem('gn_att') || 'null'); attClosed = localStorage.getItem('gn_att_closed') === '1'; } catch (e) {}
 function renderAtt() {
   var box = document.getElementById('att'), st = attState;
-  if (!st || !st.att) { box.innerHTML = ''; return; }
+  /* 17/11/2026: a saved list older than 12 h (or with no time) is not shown, so nobody acts on old counts */
+  if (!st || !st.att || !st._at || Date.now() - st._at > 12 * 3600e3) { box.innerHTML = ''; return; }
+  var asof = new Date(st._at).toLocaleTimeString(lang === 'ar' ? 'ar-EG' : 'en-GB', { timeZone: 'Africa/Cairo', hour: '2-digit', minute: '2-digit' });
   if (!st.att.length) { box.innerHTML = '<div class="att ok">' + esc(at('clear')) + '</div>'; return; }
   var cnt = st.att.reduce(function (s, a) { return s + (a[0] === 'erpMore' ? a[1] : 1); }, 0);
-  box.innerHTML = '<div class="att' + (attClosed ? ' closed' : '') + '"><button type="button" class="atth" id="atth" aria-expanded="' + !attClosed + '"><h3>' + esc(at('att')) + '</h3><span class="cnt">' + cnt + '</span><span class="chev">▾</span></button><div class="ail">' +
+  box.innerHTML = '<div class="att' + (attClosed ? ' closed' : '') + '"><button type="button" class="atth" id="atth" aria-expanded="' + !attClosed + '"><h3>' + esc(at('att')) + '</h3><span class="cnt">' + cnt + '</span><span class="asof">' + esc(asof) + '</span><span class="chev">▾</span></button><div class="ail">' +
     st.att.map(function (a) {
       var tx = a[0] === 'erp' ? a[3] : atn(a[0], a[1]), hot = a[0] === 'erp' || a[0] === 'hfRej';
       return '<a class="ai' + (hot ? ' hot' : '') + '" href="' + esc(a[2]) + '"><span class="dot"></span><span class="tx" dir="auto">' + esc(tx) + '</span><span class="gt">→</span></a>';
     }).join('') + '</div></div>';
   document.getElementById('atth').onclick = function () { attClosed = !attClosed; try { localStorage.setItem('gn_att_closed', attClosed ? '1' : '0'); } catch (e) {} renderAtt(); };
   Array.prototype.forEach.call(box.querySelectorAll('a.ai'), function (a) {
-    a.addEventListener('click', function (e) { e.preventDefault(); splash.className = ''; location.href = withAcct(a.href); });
+    a.addEventListener('click', function (e) { e.preventDefault(); showSplash(); location.href = withAcct(a.href); });
   });
 }
 window.gnAtt = function (st) {
   if (!st || st.error || !st.email) return;
-  attState = st; try { localStorage.setItem('gn_att', JSON.stringify(st)); } catch (e) {}
+  st._at = Date.now(); attState = st; try { localStorage.setItem('gn_att', JSON.stringify(st)); } catch (e) {}
   renderAtt(); renderAcct();
+  if (!window.GN_USER) window.GN_USER = st.email;
 };
 /* Account (1/11/2026): apps open with the same Google account as this page. "Change account" saves the account to use on this device
    (for people signed in to several Google accounts, e.g. a Gmail plus a work account). */
 function acct() { var u = ''; try { u = localStorage.getItem('gn_user') || ''; } catch (e) {} return u || (attState && attState.email) || ''; }
 /* No saved account: use the browser's main Google account (authuser=0). Without it script.google.com uses whichever account was last used there (2 Nov 2026). */
+window.GN_USER = (function () { try { return localStorage.getItem('gn_user') || ''; } catch (e) { return ''; } })();
 function acctSaved_() { try { return localStorage.getItem('gn_user') || ''; } catch (e) { return ''; } }
 function withAcct(h) { var u = acctSaved_() || '0'; return h.indexOf('authuser=') < 0 ? h + (h.indexOf('?') < 0 ? '?' : '&') + 'authuser=' + encodeURIComponent(u) : h; }
 var AC = { en: { as: 'Signed in as', chg: 'Change account', save: 'Save', ph: 'Your Google email' }, ar: { as: 'الحساب:', chg: 'تغيير الحساب', save: 'حفظ', ph: 'بريدك على جوجل' } };
@@ -185,8 +192,6 @@ function renderAcct(edit) {
   document.getElementById('acb').onclick = function () { renderAcct(true); };
 }
 renderAtt(); renderAcct();
-document.getElementById('lang').addEventListener('click', function () { renderAcct(); });
-document.getElementById('lang').addEventListener('click', renderAtt);
 (function () {
   var s = document.createElement('script');
   s.src = GN_APP + '?api=state&callback=gnAtt' + '&authuser=' + encodeURIComponent(acctSaved_() || '0') + '&t=' + Date.now();
