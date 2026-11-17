@@ -55,7 +55,7 @@
   }
   // the person's own account (GN apps set GN_USER; the home page keeps it in S.st.email) — avoids the
   // "no permission" error when several Google accounts are signed in on the same browser
-  function userQ() { var u = ''; try { u = window.GN_USER || (window.S && S.st && S.st.email) || ''; } catch (e) { } return /@/.test(u) ? '&authuser=' + encodeURIComponent(u) : ''; }
+  function userQ() { var u = ''; try { u = window.GN_USER || (window.S && S.st && S.st.email) || localStorage.getItem('gn_user') || (JSON.parse(localStorage.getItem('gn_att') || '{}').email) || ''; } catch (e) { } return /@/.test(u) ? '&authuser=' + encodeURIComponent(u) : ''; }
   var panel = null;
   function openPanel() {
     if (mobile) { window.top.location.href = link + userQ(); return; }   // full screen on phones
